@@ -14,6 +14,12 @@
 
 import { state } from "../state.js";
 import { $ } from "./dom.js";
+import { HELP_CONTENT } from "./help.js";
+
+// HTML escape helpers (les conseils sont en dur dans le code, mais le
+// contenu d'aide passe par <pre> et <li> → autant rester safe).
+const ESC_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ESC_MAP[c]);
 
 const MIN_SAMPLES = 60;          // ~2 s @ 30 fps before producing a verdict
 const REDRAW_INTERVAL_MS = 750;
@@ -50,7 +56,7 @@ function ruleCadence() {
     sev = "bad";
     advice = "Cadence très élevée — possible compensation (douleur, mauvais appui). Filme-toi à allure facile et compare.";
   }
-  return { sev, title: "Cadence", advice, meas: cad.toFixed(0), unit: "SPM" };
+  return { id: "cadence", sev, title: "Cadence", advice, meas: cad.toFixed(0), unit: "SPM" };
 }
 
 function ruleTrunkLean() {
@@ -74,7 +80,7 @@ function ruleTrunkLean() {
     sev = "bad";
     advice = "Tronc trop incliné / cassure au niveau de la taille. Engage les abdos, ouvre la poitrine, regarde 15–20 m devant.";
   }
-  return { sev, title: "Inclinaison du tronc", advice, meas: trunkAvg.toFixed(0), unit: "°" };
+  return { id: "trunk", sev, title: "Inclinaison du tronc", advice, meas: trunkAvg.toFixed(0), unit: "°" };
 }
 
 function ruleKneeSwingFlexion() {
@@ -94,7 +100,7 @@ function ruleKneeSwingFlexion() {
     sev = "bad";
     advice = "Jambe quasi tendue en phase oscillante : grosse perte d'efficacité, foulée raide. Travaille des éducatifs type « talons-fesses ».";
   }
-  return { sev, title: "Flexion genou (oscillation)", advice, meas: minAvg.toFixed(0), unit: "°" };
+  return { id: "kneeSwing", sev, title: "Flexion genou (oscillation)", advice, meas: minAvg.toFixed(0), unit: "°" };
 }
 
 function ruleKneeRom() {
@@ -105,14 +111,20 @@ function ruleKneeRom() {
   if (romAvg >= 55 && romAvg <= 85) {
     sev = "good";
     advice = "Amplitude de genou cohérente avec une foulée dynamique.";
-  } else if (romAvg >= 40) {
+  } else if (romAvg >= 40 && romAvg < 55) {
     sev = "warn";
     advice = "Amplitude un peu courte — foulée potentiellement trop trottinée. Pousse plus longtemps au sol.";
-  } else {
+  } else if (romAvg > 85 && romAvg <= 110) {
+    sev = "warn";
+    advice = "Amplitude élevée — tu es dans un registre sprint / bondissement, coûteux en endurance.";
+  } else if (romAvg < 40) {
     sev = "bad";
     advice = "Très faible amplitude au genou : foulée très raide, peu de propulsion. Vérifie souplesse ischios et mobilité hanche.";
+  } else {
+    sev = "bad";
+    advice = "Amplitude exagérée (>110°) : geste de sprinteur pur. À allure d'endurance, c'est très énergivore — relâche le repli.";
   }
-  return { sev, title: "Amplitude du genou (ROM)", advice, meas: romAvg.toFixed(0), unit: "°" };
+  return { id: "kneeRom", sev, title: "Amplitude du genou (ROM)", advice, meas: romAvg.toFixed(0), unit: "°" };
 }
 
 function ruleHipRom() {
@@ -123,14 +135,20 @@ function ruleHipRom() {
   if (romAvg >= 30 && romAvg <= 55) {
     sev = "good";
     advice = "Bonne ouverture de hanche — moteur principal de la course actif.";
-  } else if (romAvg >= 20) {
+  } else if (romAvg >= 20 && romAvg < 30) {
     sev = "warn";
     advice = "Manque d'extension de hanche. Souvent dû à des psoas/fléchisseurs raides (position assise prolongée). Mobilité + fentes.";
-  } else {
+  } else if (romAvg > 55 && romAvg <= 70) {
+    sev = "warn";
+    advice = "Amplitude de hanche élevée — vérifie que tu ne sur-tires pas la jambe arrière (peut indiquer une avancée excessive du pied avant).";
+  } else if (romAvg < 20) {
     sev = "bad";
     advice = "Hanches très verrouillées : tu cours « avec les genoux ». Travaille mobilité hanche + renfo fessiers (pont, hip thrust).";
+  } else {
+    sev = "bad";
+    advice = "Amplitude de hanche très élevée (>70°) : foulée probablement trop ample, sur-utilisation des fléchisseurs. Augmente la cadence.";
   }
-  return { sev, title: "Amplitude des hanches", advice, meas: romAvg.toFixed(0), unit: "°" };
+  return { id: "hipRom", sev, title: "Amplitude des hanches", advice, meas: romAvg.toFixed(0), unit: "°" };
 }
 
 function ruleKneeAsymmetry() {
@@ -150,7 +168,7 @@ function ruleKneeAsymmetry() {
     sev = "bad";
     advice = `Forte asymétrie (genou ${dominant} dominant). Possible compensation ou douleur ; consulte si persistant.`;
   }
-  return { sev, title: "Symétrie L/R des genoux", advice, meas: asym.toFixed(1), unit: "%" };
+  return { id: "kneeAsym", sev, title: "Symétrie L/R des genoux", advice, meas: asym.toFixed(1), unit: "%" };
 }
 
 function ruleHipAsymmetry() {
@@ -169,7 +187,7 @@ function ruleHipAsymmetry() {
     sev = "bad";
     advice = "Asymétrie marquée — surveille bassin/hanche, renforce le gainage latéral (planche latérale, clamshell).";
   }
-  return { sev, title: "Symétrie L/R des hanches", advice, meas: asym.toFixed(1), unit: "%" };
+  return { id: "hipAsym", sev, title: "Symétrie L/R des hanches", advice, meas: asym.toFixed(1), unit: "%" };
 }
 
 const RULES = [
@@ -221,19 +239,52 @@ export function renderAnalysis(diags) {
   $("a-score-lbl").style.color = color;
 
   diags.sort((a, b) => SEVERITY_RANK[b.sev] - SEVERITY_RANK[a.sev]);
-  list.innerHTML = diags
-    .map(
-      (d) => `
-        <div class="diag ${d.sev}">
-          <div class="icon">${ICON[d.sev]}</div>
-          <div class="body">
-            <div class="title">${d.title}</div>
-            <div class="advice">${d.advice}</div>
-          </div>
-          <div class="meas">${d.meas}<span class="unit">${d.unit}</span></div>
-        </div>`,
-    )
-    .join("");
+  list.innerHTML = diags.map(renderDiagItem).join("");
+}
+
+function renderDiagItem(d) {
+  const help = HELP_CONTENT[d.id];
+  const helpBtn = help
+    ? `<button class="help-btn" data-help="${d.id}" aria-label="Plus d'infos">?</button>`
+    : "";
+  const helpBlock = help
+    ? `<div class="diag-help" id="help-${d.id}" hidden>
+         <pre class="diag-schema">${esc(help.schema.trim())}</pre>
+         <ul class="diag-tips">${help.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>
+       </div>`
+    : "";
+  return `
+    <div class="diag ${d.sev}">
+      <div class="diag-row">
+        <div class="icon">${ICON[d.sev]}</div>
+        <div class="body">
+          <div class="title">${esc(d.title)}${helpBtn}</div>
+          <div class="advice">${esc(d.advice)}</div>
+        </div>
+        <div class="meas">${esc(d.meas)}<span class="unit">${esc(d.unit)}</span></div>
+      </div>
+      ${helpBlock}
+    </div>`;
+}
+
+// One-time event delegation : un clic sur un bouton ? ouvre/ferme la section
+// d'aide correspondante. À appeler depuis main.js après le boot.
+export function attachHelpHandler() {
+  $("diag-list").addEventListener("click", (e) => {
+    const btn = e.target.closest(".help-btn");
+    if (!btn) return;
+    const id = btn.dataset.help;
+    const block = $("help-" + id);
+    if (!block) return;
+    const isOpen = !block.hasAttribute("hidden");
+    if (isOpen) {
+      block.setAttribute("hidden", "");
+      btn.textContent = "?";
+    } else {
+      block.removeAttribute("hidden");
+      btn.textContent = "×";
+    }
+  });
 }
 
 let lastAnalysis = 0;

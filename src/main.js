@@ -21,7 +21,7 @@ import { drawSkeleton, drawAngleLabels } from "./ui/overlay.js";
 import { updateMetrics } from "./ui/metrics.js";
 import { updateCharts } from "./ui/charts.js";
 import { updateFPS, updateHUDTime } from "./ui/hud.js";
-import { updateAnalysis, renderAnalysis, runFinalAnalysis } from "./ui/analysis.js";
+import { updateAnalysis, renderAnalysis, runFinalAnalysis, attachHelpHandler } from "./ui/analysis.js";
 import { startCamera } from "./sources/camera.js";
 import { loadVideoFile, resumeVideoLoop, attachSeekHandler } from "./sources/video.js";
 import { exportCSV, exportJSON } from "./io/export.js";
@@ -192,6 +192,7 @@ function wireEvents() {
 
 async function init() {
   wireEvents();
+  attachHelpHandler();
   state.pose = await createPose(onResults);
   $("loading").classList.add("hidden");
 }
