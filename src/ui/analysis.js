@@ -198,10 +198,14 @@ function scoreLabel(score) {
 export function renderAnalysis(diags) {
   const list = $("diag-list");
   if (diags.length === 0) {
-    list.innerHTML =
-      '<div class="diag-empty">ANALYSE EN COURS — LAISSEZ TOURNER QUELQUES FOULÉES</div>';
+    const isVideo = state.mode === "video";
+    const msg = isVideo
+      ? "ANALYSE DISPONIBLE EN FIN DE LECTURE"
+      : "ANALYSE EN COURS — LAISSEZ TOURNER QUELQUES FOULÉES";
+    const lbl = isVideo ? "EN ATTENTE FIN DE VIDÉO" : "EN ATTENTE DE DONNÉES";
+    list.innerHTML = `<div class="diag-empty">${msg}</div>`;
     $("a-score").innerHTML = '—<span class="unit">/100</span>';
-    $("a-score-lbl").textContent = "EN ATTENTE DE DONNÉES";
+    $("a-score-lbl").textContent = lbl;
     $("a-score").style.color = "";
     $("a-score-lbl").style.color = "";
     return;
@@ -234,8 +238,18 @@ export function renderAnalysis(diags) {
 
 let lastAnalysis = 0;
 export function updateAnalysis() {
+  // En mode vidéo, le diagnostic est différé jusqu'à la fin de lecture
+  // (cf. main.js → `video.ended`). Cela évite la double-comptabilisation
+  // si l'utilisateur scrubbe la timeline avant la fin.
+  if (state.mode === "video") return;
   const now = performance.now();
   if (now - lastAnalysis < REDRAW_INTERVAL_MS) return;
   lastAnalysis = now;
+  renderAnalysis(buildDiagnostics());
+}
+
+// Déclenché une fois en fin de vidéo : produit le diagnostic complet sur
+// l'ensemble des frames accumulées depuis le dernier reset.
+export function runFinalAnalysis() {
   renderAnalysis(buildDiagnostics());
 }

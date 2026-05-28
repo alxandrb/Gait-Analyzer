@@ -21,7 +21,7 @@ import { drawSkeleton, drawAngleLabels } from "./ui/overlay.js";
 import { updateMetrics } from "./ui/metrics.js";
 import { updateCharts } from "./ui/charts.js";
 import { updateFPS, updateHUDTime } from "./ui/hud.js";
-import { updateAnalysis, renderAnalysis } from "./ui/analysis.js";
+import { updateAnalysis, renderAnalysis, runFinalAnalysis } from "./ui/analysis.js";
 import { startCamera } from "./sources/camera.js";
 import { loadVideoFile, resumeVideoLoop, attachSeekHandler } from "./sources/video.js";
 import { exportCSV, exportJSON } from "./io/export.js";
@@ -129,6 +129,9 @@ async function handleFile(file) {
   stopAll();
   resetAll();
   await loadVideoFile(file);
+  // state.mode est désormais "video" → on rafraîchit le placeholder
+  // pour signaler que l'analyse arrivera en fin de lecture.
+  renderAnalysis([]);
   $("btn-stop").disabled = false;
   $("btn-reset").disabled = false;
   $("btn-playpause").disabled = false;
@@ -172,6 +175,12 @@ function wireEvents() {
     }
   });
   $("seek").addEventListener("change", () => { state.seeking = false; });
+
+  // En fin de vidéo : on calcule le diagnostic une seule fois sur
+  // l'ensemble des frames accumulées.
+  video.addEventListener("ended", () => {
+    if (state.mode === "video") runFinalAnalysis();
+  });
 
   attachSeekHandler();
 
