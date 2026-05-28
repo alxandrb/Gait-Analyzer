@@ -1,0 +1,96 @@
+/* Analysis panel: score header + diagnostics list with severity styling */
+
+.analysis-score {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.analysis-score .num {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 44px;
+  line-height: 1;
+  letter-spacing: 1px;
+}
+.analysis-score .num .unit {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+.analysis-score .lbl {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  flex: 1;
+  text-align: right;
+}
+
+.diag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+}
+.diag {
+  background: var(--bg-panel);
+  padding: 10px 12px;
+  display: grid;
+  grid-template-columns: 18px 1fr auto;
+  gap: 10px;
+  align-items: start;
+}
+.diag .icon {
+  font-family: "Space Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.diag.good .icon { color: var(--good); }
+.diag.warn .icon { color: var(--warn); }
+.diag.bad .icon { color: var(--bad); }
+
+.diag .body .title {
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.diag .body .advice {
+  font-family: "Inter", sans-serif;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-top: 3px;
+  line-height: 1.45;
+}
+
+.diag .meas {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 22px;
+  line-height: 1;
+  letter-spacing: 1px;
+  color: var(--text);
+}
+.diag .meas .unit {
+  font-size: 10px;
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+.diag.good .meas { color: var(--good); }
+.diag.warn .meas { color: var(--warn); }
+.diag.bad .meas { color: var(--bad); }
+
+.diag-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--text-faint);
+  letter-spacing: 2px;
+  background: var(--bg-panel);
+}

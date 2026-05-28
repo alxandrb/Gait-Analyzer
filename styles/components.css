@@ -1,0 +1,285 @@
+/* Reusable building blocks: panels, buttons, video stage, joint cards, charts */
+
+.panel {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  padding: 18px;
+}
+.panel + .panel { margin-top: 18px; }
+.panel-title {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 16px;
+  letter-spacing: 3px;
+  color: var(--text-dim);
+  margin-bottom: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.panel-title::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+  margin-left: 12px;
+}
+
+/* Video stage */
+.stage {
+  position: relative;
+  background: #000;
+  aspect-ratio: 16/9;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.stage video,
+.stage canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.stage video { z-index: 1; }
+.stage canvas { z-index: 2; pointer-events: none; }
+
+.stage-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-faint);
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  z-index: 3;
+}
+.stage-empty .big {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 80px;
+  letter-spacing: 8px;
+  color: var(--border-bright);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+/* HUD overlay on stage */
+.hud {
+  position: absolute;
+  z-index: 4;
+  pointer-events: none;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 1px;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.9);
+}
+.hud-tl { top: 10px; left: 10px; }
+.hud-tr { top: 10px; right: 10px; text-align: right; }
+.hud-bl { bottom: 10px; left: 10px; }
+.hud-br { bottom: 10px; right: 10px; text-align: right; }
+.hud .h-label { color: var(--text-dim); font-size: 8px; letter-spacing: 2px; }
+.hud .h-val { font-size: 13px; }
+
+/* Buttons & controls */
+.controls {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.btn {
+  background: transparent;
+  border: 1px solid var(--border-bright);
+  color: var(--text);
+  padding: 12px 18px;
+  font-family: "Space Mono", monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn:hover { border-color: var(--accent); color: var(--accent); }
+.btn.primary {
+  background: var(--accent);
+  color: #000;
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.btn.primary:hover { background: #ff8a4a; border-color: #ff8a4a; color: #000; }
+.btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+.btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.btn:disabled:hover { border-color: var(--border-bright); color: var(--text); }
+
+.controls-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.timeline {
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.timeline input[type="range"] {
+  flex: 1;
+  -webkit-appearance: none;
+  background: var(--border);
+  height: 2px;
+  outline: none;
+}
+.timeline input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  cursor: pointer;
+  border-radius: 0;
+}
+.timeline input[type="range"]::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+}
+
+/* Joint cards (per-articulation angle readouts) */
+.joints {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: var(--border);
+  margin-bottom: 18px;
+}
+.joint {
+  background: var(--bg-panel);
+  padding: 12px;
+}
+.joint-header {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  margin-bottom: 6px;
+}
+.joint-header .side { padding: 1px 5px; font-size: 8px; }
+.joint-header .side.L { background: var(--left); color: #000; }
+.joint-header .side.R { background: var(--right); color: #000; }
+.joint-value {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 38px;
+  letter-spacing: 1px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.joint-value .unit {
+  font-size: 14px;
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+.joint-range {
+  display: flex;
+  justify-content: space-between;
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: var(--text-faint);
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+.joint-range span { color: var(--text-dim); }
+.joint-bar {
+  height: 3px;
+  background: var(--border);
+  margin: 6px 0;
+  position: relative;
+}
+.joint-bar-fill {
+  position: absolute;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.1s linear;
+}
+
+/* Charts */
+.chart-wrap {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  padding: 14px;
+  margin-top: 14px;
+}
+.chart-title {
+  font-family: "Space Mono", monospace;
+  font-size: 10px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.chart-legend { display: flex; gap: 12px; }
+.chart-legend .li { display: flex; align-items: center; gap: 5px; }
+.chart-legend .dot { width: 8px; height: 8px; }
+.chart-canvas { width: 100%; height: 140px; display: block; }
+
+/* Derived metrics grid */
+.secondary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  margin-top: 18px;
+}
+.secondary .cell {
+  background: var(--bg-panel);
+  padding: 12px;
+  text-align: left;
+}
+.secondary .cell .lbl {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.secondary .cell .val {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  line-height: 1;
+}
+.secondary .cell .val .unit {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 3px;
+}
+.secondary .cell .sub {
+  font-family: "Space Mono", monospace;
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-top: 4px;
+}

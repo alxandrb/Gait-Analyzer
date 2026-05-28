@@ -1,1288 +1,262 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GAIT // Analyse Cinématique</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-<style>
-:root {
-    --bg: #0a0a0a;
-    --bg-panel: #111111;
-    --bg-elevated: #161616;
-    --border: #1f1f1f;
-    --border-bright: #2a2a2a;
-    --text: #e8e8e8;
-    --text-dim: #888;
-    --text-faint: #555;
-    --accent: #ff6b1a;
-    --accent-dim: rgba(255, 107, 26, 0.15);
-    --left: #ff6b1a;
-    --right: #4ad6e0;
-    --warn: #ffcc00;
-    --bad: #ff3344;
-    --good: #4ade80;
-}
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Inter', sans-serif;
-    font-weight: 300;
-    min-height: 100vh;
-    overflow-x: hidden;
-}
-body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-        linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
-    z-index: 0;
-}
-.app { position: relative; z-index: 1; padding: 24px; max-width: 1800px; margin: 0 auto; }
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GAIT // Analyse Cinématique</title>
 
-/* HEADER */
-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding-bottom: 18px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 24px;
-}
-.logo {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 42px;
-    letter-spacing: 4px;
-    line-height: 1;
-}
-.logo span { color: var(--accent); }
-.subtitle {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-top: 6px;
-}
-.status-bar {
-    display: flex;
-    gap: 24px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-}
-.status-bar .item { display: flex; flex-direction: column; align-items: flex-end; }
-.status-bar .label { font-size: 9px; letter-spacing: 2px; }
-.status-bar .value { color: var(--text); font-size: 13px; margin-top: 2px; }
-.status-bar .value.live { color: var(--accent); }
-.status-bar .value.live::before {
-    content: '●';
-    margin-right: 6px;
-    animation: blink 1.2s infinite;
-}
-@keyframes blink { 50% { opacity: 0.3; } }
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500&display=swap"
+      rel="stylesheet"
+    />
 
-/* LAYOUT */
-.grid {
-    display: grid;
-    grid-template-columns: 1fr 380px;
-    gap: 18px;
-}
-@media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/components.css" />
+    <link rel="stylesheet" href="styles/analysis.css" />
 
-.panel {
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    padding: 18px;
-}
-.panel-title {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 16px;
-    letter-spacing: 3px;
-    color: var(--text-dim);
-    margin-bottom: 14px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-.panel-title::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
-    margin-left: 12px;
-}
+    <!-- MediaPipe runtime (UMD globals: Pose, Camera) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js"
+      crossorigin="anonymous"
+    ></script>
 
-/* VIDEO STAGE */
-.stage {
-    position: relative;
-    background: #000;
-    aspect-ratio: 16/9;
-    overflow: hidden;
-    border: 1px solid var(--border);
-}
-.stage video, .stage canvas {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-.stage video { z-index: 1; }
-.stage canvas { z-index: 2; pointer-events: none; }
-
-.stage-empty {
-    position: absolute;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    color: var(--text-faint);
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    z-index: 3;
-}
-.stage-empty .big {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 80px;
-    letter-spacing: 8px;
-    color: var(--border-bright);
-    line-height: 1;
-    margin-bottom: 12px;
-}
-
-/* HUD overlay on stage */
-.hud {
-    position: absolute;
-    z-index: 4;
-    pointer-events: none;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--accent);
-    letter-spacing: 1px;
-    text-shadow: 0 0 4px rgba(0,0,0,0.9);
-}
-.hud-tl { top: 10px; left: 10px; }
-.hud-tr { top: 10px; right: 10px; text-align: right; }
-.hud-bl { bottom: 10px; left: 10px; }
-.hud-br { bottom: 10px; right: 10px; text-align: right; }
-.hud .h-label { color: var(--text-dim); font-size: 8px; letter-spacing: 2px; }
-.hud .h-val { font-size: 13px; }
-
-/* CONTROLS */
-.controls {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-    flex-wrap: wrap;
-}
-.btn {
-    background: transparent;
-    border: 1px solid var(--border-bright);
-    color: var(--text);
-    padding: 12px 18px;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-}
-.btn:hover { border-color: var(--accent); color: var(--accent); }
-.btn.primary { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
-.btn.primary:hover { background: #ff8a4a; border-color: #ff8a4a; color: #000; }
-.btn.danger:hover { border-color: var(--bad); color: var(--bad); }
-.btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.btn:disabled:hover { border-color: var(--border-bright); color: var(--text); }
-
-.controls-bottom {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 12px;
-    padding: 12px;
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.timeline {
-    flex: 1;
-    min-width: 200px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-}
-.timeline input[type="range"] {
-    flex: 1;
-    -webkit-appearance: none;
-    background: var(--border);
-    height: 2px;
-    outline: none;
-}
-.timeline input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 12px;
-    height: 12px;
-    background: var(--accent);
-    cursor: pointer;
-    border-radius: 0;
-}
-.timeline input[type="range"]::-moz-range-thumb {
-    width: 12px; height: 12px; background: var(--accent); cursor: pointer; border: none; border-radius: 0;
-}
-
-/* METRICS — joint angles */
-.joints {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1px;
-    background: var(--border);
-    margin-bottom: 18px;
-}
-.joint {
-    background: var(--bg-panel);
-    padding: 12px;
-}
-.joint-header {
-    display: flex;
-    justify-content: space-between;
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    margin-bottom: 6px;
-}
-.joint-header .side {
-    padding: 1px 5px;
-    font-size: 8px;
-}
-.joint-header .side.L { background: var(--left); color: #000; }
-.joint-header .side.R { background: var(--right); color: #000; }
-.joint-value {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 38px;
-    letter-spacing: 1px;
-    line-height: 1;
-    margin-bottom: 4px;
-}
-.joint-value .unit { font-size: 14px; color: var(--text-dim); margin-left: 4px; }
-.joint-range {
-    display: flex;
-    justify-content: space-between;
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-faint);
-    border-top: 1px dashed var(--border);
-    padding-top: 6px;
-}
-.joint-range span { color: var(--text-dim); }
-.joint-bar {
-    height: 3px;
-    background: var(--border);
-    margin: 6px 0;
-    position: relative;
-}
-.joint-bar-fill {
-    position: absolute;
-    height: 100%;
-    background: var(--accent);
-    transition: width 0.1s linear;
-}
-
-/* CHART */
-.chart-wrap {
-    background: var(--bg-elevated);
-    border: 1px solid var(--border);
-    padding: 14px;
-    margin-top: 14px;
-}
-.chart-title {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-}
-.chart-legend { display: flex; gap: 12px; }
-.chart-legend .li { display: flex; align-items: center; gap: 5px; }
-.chart-legend .dot { width: 8px; height: 8px; }
-.chart-canvas {
-    width: 100%;
-    height: 140px;
-    display: block;
-}
-
-/* SECONDARY METRICS */
-.secondary {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1px;
-    background: var(--border);
-    margin-top: 18px;
-}
-.secondary .cell {
-    background: var(--bg-panel);
-    padding: 12px;
-    text-align: left;
-}
-.secondary .cell .lbl {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-}
-.secondary .cell .val {
-    font-family: 'Bebas Neue', sans-serif;
-    font-size: 28px;
-    letter-spacing: 1px;
-    line-height: 1;
-}
-.secondary .cell .val .unit { font-size: 11px; color: var(--text-dim); margin-left: 3px; }
-.secondary .cell .sub {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-faint);
-    margin-top: 4px;
-}
-
-/* FOOTER NOTES */
-.notes {
-    font-family: 'Space Mono', monospace;
-    font-size: 9px;
-    color: var(--text-faint);
-    letter-spacing: 1px;
-    margin-top: 24px;
-    padding-top: 14px;
-    border-top: 1px solid var(--border);
-    line-height: 1.6;
-}
-
-input[type="file"] { display: none; }
-
-/* loading */
-.loading {
-    position: fixed;
-    inset: 0;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-direction: column;
-    z-index: 100;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--text-dim);
-    letter-spacing: 3px;
-}
-.loading.hidden { display: none; }
-.loading .spin {
-    width: 30px;
-    height: 30px;
-    border: 1px solid var(--border-bright);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: rot 0.9s linear infinite;
-    margin-bottom: 16px;
-}
-@keyframes rot { to { transform: rotate(360deg); } }
-</style>
-</head>
-<body>
-<div class="loading" id="loading">
-    <div class="spin"></div>
-    <div>INITIALISATION POSE ENGINE</div>
-</div>
-
-<div class="app">
-<header>
-    <div>
-        <div class="logo">GAIT<span>/</span>ANALYZER</div>
-        <div class="subtitle">CINÉMATIQUE ARTICULAIRE — MEDIAPIPE POSE LANDMARKER</div>
+    <script type="module" src="src/main.js"></script>
+  </head>
+  <body>
+    <div class="loading" id="loading">
+      <div class="spin"></div>
+      <div>INITIALISATION POSE ENGINE</div>
     </div>
-    <div class="status-bar">
-        <div class="item"><span class="label">SOURCE</span><span class="value" id="s-source">—</span></div>
-        <div class="item"><span class="label">FPS</span><span class="value" id="s-fps">0</span></div>
-        <div class="item"><span class="label">FRAME</span><span class="value" id="s-frame">0000</span></div>
-        <div class="item"><span class="label">STATUT</span><span class="value" id="s-status">EN ATTENTE</span></div>
-    </div>
-</header>
 
-<div class="grid">
-    <!-- LEFT: VIDEO -->
-    <div>
-        <div class="panel">
-            <div class="panel-title"><span>CAPTURE</span><span style="font-family:'Space Mono',monospace;font-size:10px;color:var(--text-faint);" id="resolution">—</span></div>
+    <div class="app">
+      <header>
+        <div>
+          <div class="logo">GAIT<span>/</span>ANALYZER</div>
+          <div class="subtitle">CINÉMATIQUE ARTICULAIRE — MEDIAPIPE POSE LANDMARKER</div>
+        </div>
+        <div class="status-bar">
+          <div class="item"><span class="label">SOURCE</span><span class="value" id="s-source">—</span></div>
+          <div class="item"><span class="label">FPS</span><span class="value" id="s-fps">0</span></div>
+          <div class="item"><span class="label">FRAME</span><span class="value" id="s-frame">0000</span></div>
+          <div class="item"><span class="label">STATUT</span><span class="value" id="s-status">EN ATTENTE</span></div>
+        </div>
+      </header>
+
+      <div class="grid">
+        <!-- LEFT COLUMN — capture + charts -->
+        <div>
+          <div class="panel">
+            <div class="panel-title">
+              <span>CAPTURE</span>
+              <span style="font-family: 'Space Mono', monospace; font-size: 10px; color: var(--text-faint);" id="resolution">—</span>
+            </div>
             <div class="stage" id="stage">
-                <video id="video" playsinline muted></video>
-                <canvas id="overlay"></canvas>
-                <div class="stage-empty" id="stage-empty">
-                    <div class="big">— —</div>
-                    <div>SÉLECTIONNEZ UNE SOURCE</div>
-                </div>
-                <div class="hud hud-tl"><div class="h-label">CONFIANCE POSE</div><div class="h-val" id="hud-conf">—</div></div>
-                <div class="hud hud-tr"><div class="h-label">TEMPS</div><div class="h-val" id="hud-time">00:00.00</div></div>
-                <div class="hud hud-bl"><div class="h-label">CADENCE EST.</div><div class="h-val" id="hud-cad">— SPM</div></div>
-                <div class="hud hud-br"><div class="h-label">CYCLE</div><div class="h-val" id="hud-cycle">—</div></div>
+              <video id="video" playsinline muted></video>
+              <canvas id="overlay"></canvas>
+              <div class="stage-empty" id="stage-empty">
+                <div class="big">— —</div>
+                <div>SÉLECTIONNEZ UNE SOURCE</div>
+              </div>
+              <div class="hud hud-tl"><div class="h-label">CONFIANCE POSE</div><div class="h-val" id="hud-conf">—</div></div>
+              <div class="hud hud-tr"><div class="h-label">TEMPS</div><div class="h-val" id="hud-time">00:00.00</div></div>
+              <div class="hud hud-bl"><div class="h-label">CADENCE EST.</div><div class="h-val" id="hud-cad">— SPM</div></div>
+              <div class="hud hud-br"><div class="h-label">CYCLE</div><div class="h-val" id="hud-cycle">—</div></div>
             </div>
             <div class="controls">
-                <button class="btn primary" id="btn-camera">▶ CAMÉRA LIVE</button>
-                <label class="btn" for="file-input">⬆ UPLOAD VIDÉO</label>
-                <input type="file" id="file-input" accept="video/*">
-                <button class="btn danger" id="btn-stop" disabled>■ STOP</button>
-                <button class="btn" id="btn-reset" disabled>↺ RESET</button>
+              <button class="btn primary" id="btn-camera">▶ CAMÉRA LIVE</button>
+              <label class="btn" for="file-input">⬆ UPLOAD VIDÉO</label>
+              <input type="file" id="file-input" accept="video/*" />
+              <button class="btn danger" id="btn-stop" disabled>■ STOP</button>
+              <button class="btn" id="btn-reset" disabled>↺ RESET</button>
             </div>
             <div class="controls-bottom">
-                <div class="timeline">
-                    <span id="t-current">00:00</span>
-                    <input type="range" id="seek" min="0" max="100" value="0" step="0.1" disabled>
-                    <span id="t-total">00:00</span>
-                </div>
-                <button class="btn" id="btn-playpause" disabled>⏸ PAUSE</button>
+              <div class="timeline">
+                <span id="t-current">00:00</span>
+                <input type="range" id="seek" min="0" max="100" value="0" step="0.1" disabled />
+                <span id="t-total">00:00</span>
+              </div>
+              <button class="btn" id="btn-playpause" disabled>⏸ PAUSE</button>
             </div>
-        </div>
+          </div>
 
-        <div class="panel" style="margin-top:18px;">
+          <div class="panel">
             <div class="panel-title"><span>TIMELINE — ANGLES PAR FOULÉE</span></div>
             <div class="chart-wrap">
-                <div class="chart-title">
-                    <span>GENOU — FLEXION (°) — DERNIÈRES 6 SEC</span>
-                    <div class="chart-legend">
-                        <div class="li"><div class="dot" style="background:var(--left)"></div><span>GAUCHE</span></div>
-                        <div class="li"><div class="dot" style="background:var(--right)"></div><span>DROIT</span></div>
-                    </div>
+              <div class="chart-title">
+                <span>GENOU — FLEXION (°) — DERNIÈRES 6 SEC</span>
+                <div class="chart-legend">
+                  <div class="li"><div class="dot" style="background: var(--left)"></div><span>GAUCHE</span></div>
+                  <div class="li"><div class="dot" style="background: var(--right)"></div><span>DROIT</span></div>
                 </div>
-                <canvas class="chart-canvas" id="chart-knee"></canvas>
+              </div>
+              <canvas class="chart-canvas" id="chart-knee"></canvas>
             </div>
             <div class="chart-wrap">
-                <div class="chart-title">
-                    <span>HANCHE — FLEXION (°)</span>
-                    <div class="chart-legend">
-                        <div class="li"><div class="dot" style="background:var(--left)"></div><span>GAUCHE</span></div>
-                        <div class="li"><div class="dot" style="background:var(--right)"></div><span>DROIT</span></div>
-                    </div>
+              <div class="chart-title">
+                <span>HANCHE — FLEXION (°)</span>
+                <div class="chart-legend">
+                  <div class="li"><div class="dot" style="background: var(--left)"></div><span>GAUCHE</span></div>
+                  <div class="li"><div class="dot" style="background: var(--right)"></div><span>DROIT</span></div>
                 </div>
-                <canvas class="chart-canvas" id="chart-hip"></canvas>
+              </div>
+              <canvas class="chart-canvas" id="chart-hip"></canvas>
             </div>
             <div class="chart-wrap">
-                <div class="chart-title">
-                    <span>CHEVILLE — FLEXION (°)</span>
-                    <div class="chart-legend">
-                        <div class="li"><div class="dot" style="background:var(--left)"></div><span>GAUCHE</span></div>
-                        <div class="li"><div class="dot" style="background:var(--right)"></div><span>DROIT</span></div>
-                    </div>
+              <div class="chart-title">
+                <span>CHEVILLE — FLEXION (°)</span>
+                <div class="chart-legend">
+                  <div class="li"><div class="dot" style="background: var(--left)"></div><span>GAUCHE</span></div>
+                  <div class="li"><div class="dot" style="background: var(--right)"></div><span>DROIT</span></div>
                 </div>
-                <canvas class="chart-canvas" id="chart-ankle"></canvas>
+              </div>
+              <canvas class="chart-canvas" id="chart-ankle"></canvas>
             </div>
+          </div>
         </div>
-    </div>
 
-    <!-- RIGHT: METRICS -->
-    <div>
-        <div class="panel">
+        <!-- RIGHT COLUMN — metrics + analysis + export -->
+        <div>
+          <div class="panel">
             <div class="panel-title"><span>ANGLES INSTANTANÉS</span></div>
             <div class="joints">
-                <!-- KNEE L -->
-                <div class="joint">
-                    <div class="joint-header"><span>GENOU</span><span class="side L">L</span></div>
-                    <div class="joint-value" id="v-knee-L">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-knee-L"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-knee-L">—</span>°</span>
-                        <span>MOY <span id="avg-knee-L">—</span>°</span>
-                        <span>MAX <span id="max-knee-L">—</span>°</span>
-                    </div>
+              <div class="joint">
+                <div class="joint-header"><span>GENOU</span><span class="side L">L</span></div>
+                <div class="joint-value" id="v-knee-L">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-knee-L"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-knee-L">—</span>°</span>
+                  <span>MOY <span id="avg-knee-L">—</span>°</span>
+                  <span>MAX <span id="max-knee-L">—</span>°</span>
                 </div>
-                <!-- KNEE R -->
-                <div class="joint">
-                    <div class="joint-header"><span>GENOU</span><span class="side R">R</span></div>
-                    <div class="joint-value" id="v-knee-R">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-knee-R" style="background:var(--right)"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-knee-R">—</span>°</span>
-                        <span>MOY <span id="avg-knee-R">—</span>°</span>
-                        <span>MAX <span id="max-knee-R">—</span>°</span>
-                    </div>
+              </div>
+              <div class="joint">
+                <div class="joint-header"><span>GENOU</span><span class="side R">R</span></div>
+                <div class="joint-value" id="v-knee-R">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-knee-R" style="background: var(--right)"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-knee-R">—</span>°</span>
+                  <span>MOY <span id="avg-knee-R">—</span>°</span>
+                  <span>MAX <span id="max-knee-R">—</span>°</span>
                 </div>
-                <!-- HIP L -->
-                <div class="joint">
-                    <div class="joint-header"><span>HANCHE</span><span class="side L">L</span></div>
-                    <div class="joint-value" id="v-hip-L">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-hip-L"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-hip-L">—</span>°</span>
-                        <span>MOY <span id="avg-hip-L">—</span>°</span>
-                        <span>MAX <span id="max-hip-L">—</span>°</span>
-                    </div>
+              </div>
+              <div class="joint">
+                <div class="joint-header"><span>HANCHE</span><span class="side L">L</span></div>
+                <div class="joint-value" id="v-hip-L">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-hip-L"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-hip-L">—</span>°</span>
+                  <span>MOY <span id="avg-hip-L">—</span>°</span>
+                  <span>MAX <span id="max-hip-L">—</span>°</span>
                 </div>
-                <!-- HIP R -->
-                <div class="joint">
-                    <div class="joint-header"><span>HANCHE</span><span class="side R">R</span></div>
-                    <div class="joint-value" id="v-hip-R">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-hip-R" style="background:var(--right)"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-hip-R">—</span>°</span>
-                        <span>MOY <span id="avg-hip-R">—</span>°</span>
-                        <span>MAX <span id="max-hip-R">—</span>°</span>
-                    </div>
+              </div>
+              <div class="joint">
+                <div class="joint-header"><span>HANCHE</span><span class="side R">R</span></div>
+                <div class="joint-value" id="v-hip-R">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-hip-R" style="background: var(--right)"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-hip-R">—</span>°</span>
+                  <span>MOY <span id="avg-hip-R">—</span>°</span>
+                  <span>MAX <span id="max-hip-R">—</span>°</span>
                 </div>
-                <!-- ANKLE L -->
-                <div class="joint">
-                    <div class="joint-header"><span>CHEVILLE</span><span class="side L">L</span></div>
-                    <div class="joint-value" id="v-ank-L">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-ank-L"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-ank-L">—</span>°</span>
-                        <span>MOY <span id="avg-ank-L">—</span>°</span>
-                        <span>MAX <span id="max-ank-L">—</span>°</span>
-                    </div>
+              </div>
+              <div class="joint">
+                <div class="joint-header"><span>CHEVILLE</span><span class="side L">L</span></div>
+                <div class="joint-value" id="v-ank-L">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-ank-L"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-ank-L">—</span>°</span>
+                  <span>MOY <span id="avg-ank-L">—</span>°</span>
+                  <span>MAX <span id="max-ank-L">—</span>°</span>
                 </div>
-                <!-- ANKLE R -->
-                <div class="joint">
-                    <div class="joint-header"><span>CHEVILLE</span><span class="side R">R</span></div>
-                    <div class="joint-value" id="v-ank-R">—<span class="unit">°</span></div>
-                    <div class="joint-bar"><div class="joint-bar-fill" id="b-ank-R" style="background:var(--right)"></div></div>
-                    <div class="joint-range">
-                        <span>MIN <span id="min-ank-R">—</span>°</span>
-                        <span>MOY <span id="avg-ank-R">—</span>°</span>
-                        <span>MAX <span id="max-ank-R">—</span>°</span>
-                    </div>
+              </div>
+              <div class="joint">
+                <div class="joint-header"><span>CHEVILLE</span><span class="side R">R</span></div>
+                <div class="joint-value" id="v-ank-R">—<span class="unit">°</span></div>
+                <div class="joint-bar"><div class="joint-bar-fill" id="b-ank-R" style="background: var(--right)"></div></div>
+                <div class="joint-range">
+                  <span>MIN <span id="min-ank-R">—</span>°</span>
+                  <span>MOY <span id="avg-ank-R">—</span>°</span>
+                  <span>MAX <span id="max-ank-R">—</span>°</span>
                 </div>
+              </div>
             </div>
-        </div>
+          </div>
 
-        <div class="panel" style="margin-top:18px;">
+          <div class="panel">
             <div class="panel-title"><span>DÉRIVÉES</span></div>
             <div class="secondary">
-                <div class="cell">
-                    <div class="lbl">INCL. TRONC</div>
-                    <div class="val" id="v-trunk">—<span class="unit">°</span></div>
-                    <div class="sub">vers l'avant</div>
-                </div>
-                <div class="cell">
-                    <div class="lbl">ASYM. GENOU</div>
-                    <div class="val" id="v-asym-knee">—<span class="unit">%</span></div>
-                    <div class="sub" id="v-asym-knee-sub">L vs R</div>
-                </div>
-                <div class="cell">
-                    <div class="lbl">ASYM. HANCHE</div>
-                    <div class="val" id="v-asym-hip">—<span class="unit">%</span></div>
-                    <div class="sub" id="v-asym-hip-sub">L vs R</div>
-                </div>
-                <div class="cell">
-                    <div class="lbl">ROM GENOU L</div>
-                    <div class="val" id="v-rom-knee-L">—<span class="unit">°</span></div>
-                    <div class="sub">amplitude totale</div>
-                </div>
-                <div class="cell">
-                    <div class="lbl">ROM GENOU R</div>
-                    <div class="val" id="v-rom-knee-R">—<span class="unit">°</span></div>
-                    <div class="sub">amplitude totale</div>
-                </div>
-                <div class="cell">
-                    <div class="lbl">FOULÉES</div>
-                    <div class="val" id="v-strides">0</div>
-                    <div class="sub">détectées</div>
-                </div>
+              <div class="cell">
+                <div class="lbl">INCL. TRONC</div>
+                <div class="val" id="v-trunk">—<span class="unit">°</span></div>
+                <div class="sub">vers l'avant</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">ASYM. GENOU</div>
+                <div class="val" id="v-asym-knee">—<span class="unit">%</span></div>
+                <div class="sub" id="v-asym-knee-sub">L vs R</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">ASYM. HANCHE</div>
+                <div class="val" id="v-asym-hip">—<span class="unit">%</span></div>
+                <div class="sub" id="v-asym-hip-sub">L vs R</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">ROM GENOU L</div>
+                <div class="val" id="v-rom-knee-L">—<span class="unit">°</span></div>
+                <div class="sub">amplitude totale</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">ROM GENOU R</div>
+                <div class="val" id="v-rom-knee-R">—<span class="unit">°</span></div>
+                <div class="sub">amplitude totale</div>
+              </div>
+              <div class="cell">
+                <div class="lbl">FOULÉES</div>
+                <div class="val" id="v-strides">0</div>
+                <div class="sub">détectées</div>
+              </div>
             </div>
-        </div>
+          </div>
 
-        <div class="panel" style="margin-top:18px;">
+          <div class="panel">
+            <div class="panel-title"><span>ANALYSE &amp; CONSEILS</span></div>
+            <div class="analysis-score">
+              <div class="num" id="a-score">—<span class="unit">/100</span></div>
+              <div class="lbl" id="a-score-lbl">EN ATTENTE DE DONNÉES</div>
+            </div>
+            <div class="diag-list" id="diag-list">
+              <div class="diag-empty">ANALYSE EN COURS — LAISSEZ TOURNER QUELQUES FOULÉES</div>
+            </div>
+          </div>
+
+          <div class="panel">
             <div class="panel-title"><span>EXPORT</span></div>
             <div class="controls">
-                <button class="btn" id="btn-export-csv">⬇ CSV BRUT</button>
-                <button class="btn" id="btn-export-json">⬇ JSON</button>
+              <button class="btn" id="btn-export-csv">⬇ CSV BRUT</button>
+              <button class="btn" id="btn-export-json">⬇ JSON</button>
             </div>
-            <div class="notes" style="margin-top:8px;border:none;padding:0;">
-                Données brutes : timestamp, landmarks (x,y,z,visibility), 6 angles articulaires, inclinaison tronc, par frame.
+            <div class="notes" style="margin-top: 8px; border: none; padding: 0;">
+              Données brutes : timestamp, landmarks (x,y,z,visibility), 6 angles articulaires, inclinaison tronc, par frame.
             </div>
+          </div>
         </div>
+      </div>
+
+      <div class="notes">
+        GAIT/ANALYZER v1.0 — Pipeline : MediaPipe Pose (33 landmarks) → angles articulaires 3D (loi du cosinus sur vecteurs 3D normalisés) → détection de foulée par minima locaux du genou → statistiques agrégées.
+        Pour un résultat fiable : profil latéral, sujet de plein corps cadré, lumière homogène, fond contrasté. Tapis de course = idéal.
+        Limites : MediaPipe sous-estime systématiquement la flexion plantaire/dorsale (faible définition du pied) — interpréter cheville avec prudence.
+      </div>
     </div>
-</div>
-
-<div class="notes">
-    GAIT/ANALYZER v1.0 — Pipeline : MediaPipe Pose (33 landmarks) → angles articulaires 3D (loi du cosinus sur vecteurs 3D normalisés) → détection de foulée par minima locaux du genou → statistiques agrégées.
-    Pour un résultat fiable : profil latéral, sujet de plein corps cadré, lumière homogène, fond contrasté. Tapis de course = idéal.
-    Limites : MediaPipe sous-estime systématiquement la flexion plantaire/dorsale (faible définition du pied) — interpréter cheville avec prudence.
-</div>
-</div>
-
-<script>
-// ============================================================
-// GAIT ANALYZER — core
-// ============================================================
-
-const $ = id => document.getElementById(id);
-
-// Landmark indices (MediaPipe Pose)
-const LM = {
-    LEFT_SHOULDER: 11, RIGHT_SHOULDER: 12,
-    LEFT_HIP: 23, RIGHT_HIP: 24,
-    LEFT_KNEE: 25, RIGHT_KNEE: 26,
-    LEFT_ANKLE: 27, RIGHT_ANKLE: 28,
-    LEFT_HEEL: 29, RIGHT_HEEL: 30,
-    LEFT_FOOT_INDEX: 31, RIGHT_FOOT_INDEX: 32,
-};
-
-// state
-const state = {
-    mode: null, // 'live' | 'video'
-    pose: null,
-    camera: null,
-    running: false,
-    frameCount: 0,
-    startTime: 0,
-    fpsTime: 0,
-    fpsCount: 0,
-    fps: 0,
-    history: { // last N frames per metric for charts
-        kneeL: [], kneeR: [],
-        hipL: [], hipR: [],
-        ankL: [], ankR: [],
-    },
-    cycleHistory: { // long term stats across stride detection
-        kneeL: [], kneeR: [],
-        hipL: [], hipR: [],
-        ankL: [], ankR: [],
-    },
-    minMax: {}, // per-joint running min/max
-    strideDetector: { lastPeakTime: 0, lastValleys: [], strides: 0, cadence: 0 },
-    rawLog: [], // for export
-    seeking: false,
-};
-
-const MAX_HISTORY = 240; // ~6s at 40fps
-
-// ============================================================
-// MATH
-// ============================================================
-
-// 3D angle at point B given A-B-C, using normalized 3D vectors
-function angle3D(A, B, C) {
-    if (!A || !B || !C) return null;
-    if ((A.visibility ?? 1) < 0.4 || (B.visibility ?? 1) < 0.4 || (C.visibility ?? 1) < 0.4) return null;
-    const ABx = A.x - B.x, ABy = A.y - B.y, ABz = (A.z||0) - (B.z||0);
-    const CBx = C.x - B.x, CBy = C.y - B.y, CBz = (C.z||0) - (B.z||0);
-    const dot = ABx*CBx + ABy*CBy + ABz*CBz;
-    const magAB = Math.hypot(ABx, ABy, ABz);
-    const magCB = Math.hypot(CBx, CBy, CBz);
-    if (magAB === 0 || magCB === 0) return null;
-    const cos = Math.max(-1, Math.min(1, dot / (magAB * magCB)));
-    return Math.acos(cos) * 180 / Math.PI;
-}
-
-// trunk forward lean: angle between hip-shoulder vector and vertical
-function trunkLean(lm) {
-    const ls = lm[LM.LEFT_SHOULDER], rs = lm[LM.RIGHT_SHOULDER];
-    const lh = lm[LM.LEFT_HIP], rh = lm[LM.RIGHT_HIP];
-    if (!ls || !rs || !lh || !rh) return null;
-    const sx = (ls.x + rs.x) / 2, sy = (ls.y + rs.y) / 2;
-    const hx = (lh.x + rh.x) / 2, hy = (lh.y + rh.y) / 2;
-    // vector from hip to shoulder (in image space; y down)
-    const vx = sx - hx, vy = sy - hy;
-    // vertical is (0, -1); angle from vertical
-    const mag = Math.hypot(vx, vy);
-    if (mag === 0) return null;
-    const cos = (-vy) / mag; // dot with (0,-1)
-    return Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
-}
-
-function computeAngles(lm) {
-    return {
-        kneeL: angle3D(lm[LM.LEFT_HIP], lm[LM.LEFT_KNEE], lm[LM.LEFT_ANKLE]),
-        kneeR: angle3D(lm[LM.RIGHT_HIP], lm[LM.RIGHT_KNEE], lm[LM.RIGHT_ANKLE]),
-        hipL: angle3D(lm[LM.LEFT_SHOULDER], lm[LM.LEFT_HIP], lm[LM.LEFT_KNEE]),
-        hipR: angle3D(lm[LM.RIGHT_SHOULDER], lm[LM.RIGHT_HIP], lm[LM.RIGHT_KNEE]),
-        ankL: angle3D(lm[LM.LEFT_KNEE], lm[LM.LEFT_ANKLE], lm[LM.LEFT_FOOT_INDEX]),
-        ankR: angle3D(lm[LM.RIGHT_KNEE], lm[LM.RIGHT_ANKLE], lm[LM.RIGHT_FOOT_INDEX]),
-        trunk: trunkLean(lm),
-    };
-}
-
-// ============================================================
-// MEDIAPIPE INIT
-// ============================================================
-
-const video = $('video');
-const overlay = $('overlay');
-const ctx = overlay.getContext('2d');
-
-async function initPose() {
-    state.pose = new Pose({
-        locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`,
-    });
-    state.pose.setOptions({
-        modelComplexity: 1,
-        smoothLandmarks: true,
-        enableSegmentation: false,
-        minDetectionConfidence: 0.5,
-        minTrackingConfidence: 0.5,
-    });
-    state.pose.onResults(onResults);
-    await state.pose.initialize?.();
-    $('loading').classList.add('hidden');
-}
-
-// ============================================================
-// RESULTS HANDLER
-// ============================================================
-
-function onResults(results) {
-    // size canvas
-    const w = video.videoWidth || results.image?.width || 1280;
-    const h = video.videoHeight || results.image?.height || 720;
-    if (overlay.width !== w) { overlay.width = w; overlay.height = h; }
-
-    ctx.clearRect(0, 0, w, h);
-
-    if (!results.poseLandmarks) {
-        $('hud-conf').textContent = 'N/A';
-        return;
-    }
-
-    const lm = results.poseLandmarks;
-    drawSkeleton(lm, w, h);
-
-    const angles = computeAngles(lm);
-    drawAngleLabels(lm, angles, w, h);
-
-    updateMetrics(angles);
-    updateCharts();
-
-    // confidence: avg visibility of relevant landmarks
-    const keyLMs = [LM.LEFT_HIP, LM.RIGHT_HIP, LM.LEFT_KNEE, LM.RIGHT_KNEE, LM.LEFT_ANKLE, LM.RIGHT_ANKLE];
-    const conf = keyLMs.reduce((s, i) => s + (lm[i]?.visibility ?? 0), 0) / keyLMs.length;
-    $('hud-conf').textContent = (conf * 100).toFixed(0) + '%';
-
-    // stride detection on left knee minima (extension peaks)
-    detectStride(angles, performance.now());
-
-    // log raw
-    if (state.running && state.rawLog.length < 100000) {
-        state.rawLog.push({
-            t: (performance.now() - state.startTime) / 1000,
-            f: state.frameCount,
-            angles,
-            landmarks: lm.map(p => ({ x: +p.x.toFixed(4), y: +p.y.toFixed(4), z: +(p.z??0).toFixed(4), v: +(p.visibility??0).toFixed(3) })),
-        });
-    }
-
-    state.frameCount++;
-    updateFPS();
-    updateHUDTime();
-}
-
-// ============================================================
-// DRAWING
-// ============================================================
-
-const SKELETON_PAIRS = [
-    // torso
-    [LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER],
-    [LM.LEFT_SHOULDER, LM.LEFT_HIP],
-    [LM.RIGHT_SHOULDER, LM.RIGHT_HIP],
-    [LM.LEFT_HIP, LM.RIGHT_HIP],
-    // left leg
-    [LM.LEFT_HIP, LM.LEFT_KNEE],
-    [LM.LEFT_KNEE, LM.LEFT_ANKLE],
-    [LM.LEFT_ANKLE, LM.LEFT_HEEL],
-    [LM.LEFT_ANKLE, LM.LEFT_FOOT_INDEX],
-    [LM.LEFT_HEEL, LM.LEFT_FOOT_INDEX],
-    // right leg
-    [LM.RIGHT_HIP, LM.RIGHT_KNEE],
-    [LM.RIGHT_KNEE, LM.RIGHT_ANKLE],
-    [LM.RIGHT_ANKLE, LM.RIGHT_HEEL],
-    [LM.RIGHT_ANKLE, LM.RIGHT_FOOT_INDEX],
-    [LM.RIGHT_HEEL, LM.RIGHT_FOOT_INDEX],
-];
-const LEFT_LM = new Set([11, 23, 25, 27, 29, 31]);
-const RIGHT_LM = new Set([12, 24, 26, 28, 30, 32]);
-
-function drawSkeleton(lm, w, h) {
-    ctx.lineWidth = 3;
-    for (const [a, b] of SKELETON_PAIRS) {
-        const A = lm[a], B = lm[b];
-        if (!A || !B) continue;
-        if ((A.visibility ?? 1) < 0.3 || (B.visibility ?? 1) < 0.3) continue;
-        const isLeft = LEFT_LM.has(a) && LEFT_LM.has(b);
-        const isRight = RIGHT_LM.has(a) && RIGHT_LM.has(b);
-        ctx.strokeStyle = isLeft ? '#ff6b1a' : isRight ? '#4ad6e0' : '#888';
-        ctx.beginPath();
-        ctx.moveTo(A.x * w, A.y * h);
-        ctx.lineTo(B.x * w, B.y * h);
-        ctx.stroke();
-    }
-    // points
-    const keyPoints = [
-        LM.LEFT_SHOULDER, LM.RIGHT_SHOULDER,
-        LM.LEFT_HIP, LM.RIGHT_HIP,
-        LM.LEFT_KNEE, LM.RIGHT_KNEE,
-        LM.LEFT_ANKLE, LM.RIGHT_ANKLE,
-        LM.LEFT_HEEL, LM.RIGHT_HEEL,
-        LM.LEFT_FOOT_INDEX, LM.RIGHT_FOOT_INDEX,
-    ];
-    for (const i of keyPoints) {
-        const p = lm[i];
-        if (!p || (p.visibility ?? 1) < 0.3) continue;
-        ctx.fillStyle = LEFT_LM.has(i) ? '#ff6b1a' : '#4ad6e0';
-        ctx.beginPath();
-        ctx.arc(p.x * w, p.y * h, 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-    }
-}
-
-function drawAngleLabels(lm, angles, w, h) {
-    ctx.font = 'bold 14px "Space Mono", monospace';
-    ctx.textAlign = 'left';
-    const labels = [
-        { lm: LM.LEFT_KNEE, val: angles.kneeL, color: '#ff6b1a' },
-        { lm: LM.RIGHT_KNEE, val: angles.kneeR, color: '#4ad6e0' },
-        { lm: LM.LEFT_HIP, val: angles.hipL, color: '#ff6b1a' },
-        { lm: LM.RIGHT_HIP, val: angles.hipR, color: '#4ad6e0' },
-        { lm: LM.LEFT_ANKLE, val: angles.ankL, color: '#ff6b1a' },
-        { lm: LM.RIGHT_ANKLE, val: angles.ankR, color: '#4ad6e0' },
-    ];
-    for (const { lm: idx, val, color } of labels) {
-        const p = lm[idx];
-        if (!p || val == null || (p.visibility ?? 1) < 0.4) continue;
-        const x = p.x * w + 12, y = p.y * h + 4;
-        const txt = val.toFixed(0) + '°';
-        const wT = ctx.measureText(txt).width;
-        ctx.fillStyle = 'rgba(0,0,0,0.7)';
-        ctx.fillRect(x - 3, y - 13, wT + 6, 18);
-        ctx.fillStyle = color;
-        ctx.fillText(txt, x, y);
-    }
-}
-
-// ============================================================
-// METRICS UPDATE
-// ============================================================
-
-const JOINTS = ['kneeL','kneeR','hipL','hipR','ankL','ankR'];
-const DOM_MAP = {
-    kneeL: { v:'v-knee-L', b:'b-knee-L', min:'min-knee-L', max:'max-knee-L', avg:'avg-knee-L' },
-    kneeR: { v:'v-knee-R', b:'b-knee-R', min:'min-knee-R', max:'max-knee-R', avg:'avg-knee-R' },
-    hipL:  { v:'v-hip-L', b:'b-hip-L', min:'min-hip-L', max:'max-hip-L', avg:'avg-hip-L' },
-    hipR:  { v:'v-hip-R', b:'b-hip-R', min:'min-hip-R', max:'max-hip-R', avg:'avg-hip-R' },
-    ankL:  { v:'v-ank-L', b:'b-ank-L', min:'min-ank-L', max:'max-ank-L', avg:'avg-ank-L' },
-    ankR:  { v:'v-ank-R', b:'b-ank-R', min:'min-ank-R', max:'max-ank-R', avg:'avg-ank-R' },
-};
-
-function updateMetrics(angles) {
-    for (const j of JOINTS) {
-        const v = angles[j];
-        if (v == null) continue;
-        // history (rolling window)
-        state.history[j].push(v);
-        if (state.history[j].length > MAX_HISTORY) state.history[j].shift();
-        // cumulative for stats
-        state.cycleHistory[j].push(v);
-        if (state.cycleHistory[j].length > 6000) state.cycleHistory[j].shift();
-
-        const dom = DOM_MAP[j];
-        $(dom.v).innerHTML = v.toFixed(0) + '<span class="unit">°</span>';
-
-        // bar: map 30-180 to 0-100%
-        const pct = Math.max(0, Math.min(100, ((v - 30) / 150) * 100));
-        $(dom.b).style.width = pct + '%';
-
-        // running stats
-        if (!state.minMax[j]) state.minMax[j] = { min: v, max: v };
-        state.minMax[j].min = Math.min(state.minMax[j].min, v);
-        state.minMax[j].max = Math.max(state.minMax[j].max, v);
-
-        const arr = state.cycleHistory[j];
-        const avg = arr.reduce((s,x) => s+x, 0) / arr.length;
-
-        $(dom.min).textContent = state.minMax[j].min.toFixed(0);
-        $(dom.max).textContent = state.minMax[j].max.toFixed(0);
-        $(dom.avg).textContent = avg.toFixed(0);
-    }
-
-    // trunk
-    if (angles.trunk != null) {
-        $('v-trunk').innerHTML = angles.trunk.toFixed(0) + '<span class="unit">°</span>';
-    }
-
-    // asymmetries
-    const kL = state.cycleHistory.kneeL, kR = state.cycleHistory.kneeR;
-    if (kL.length > 30 && kR.length > 30) {
-        const avgL = kL.reduce((s,x)=>s+x,0)/kL.length;
-        const avgR = kR.reduce((s,x)=>s+x,0)/kR.length;
-        const asym = Math.abs(avgL - avgR) / ((avgL+avgR)/2) * 100;
-        $('v-asym-knee').innerHTML = asym.toFixed(1) + '<span class="unit">%</span>';
-        $('v-asym-knee-sub').textContent = `L ${avgL.toFixed(0)}° / R ${avgR.toFixed(0)}°`;
-
-        // ROM
-        const romL = Math.max(...kL) - Math.min(...kL);
-        const romR = Math.max(...kR) - Math.min(...kR);
-        $('v-rom-knee-L').innerHTML = romL.toFixed(0) + '<span class="unit">°</span>';
-        $('v-rom-knee-R').innerHTML = romR.toFixed(0) + '<span class="unit">°</span>';
-    }
-    const hL = state.cycleHistory.hipL, hR = state.cycleHistory.hipR;
-    if (hL.length > 30 && hR.length > 30) {
-        const avgL = hL.reduce((s,x)=>s+x,0)/hL.length;
-        const avgR = hR.reduce((s,x)=>s+x,0)/hR.length;
-        const asym = Math.abs(avgL - avgR) / ((avgL+avgR)/2) * 100;
-        $('v-asym-hip').innerHTML = asym.toFixed(1) + '<span class="unit">%</span>';
-        $('v-asym-hip-sub').textContent = `L ${avgL.toFixed(0)}° / R ${avgR.toFixed(0)}°`;
-    }
-}
-
-// ============================================================
-// STRIDE DETECTION (simple peak detection on knee flexion)
-// ============================================================
-
-function detectStride(angles, now) {
-    if (angles.kneeL == null) return;
-    const buf = state.strideDetector;
-    // we look for peaks (high flexion = low angle) in kneeL
-    const hist = state.history.kneeL;
-    if (hist.length < 7) return;
-    const n = hist.length;
-    // valley check on hist[n-4]
-    const c = hist[n-4], a = hist[n-7], b = hist[n-1];
-    if (c < a - 15 && c < b - 15 && c < 100) {
-        // a valley (max flexion); call it a stride
-        const dt = now - buf.lastPeakTime;
-        if (dt > 300) { // debounce
-            if (buf.lastPeakTime > 0 && dt < 1500) {
-                buf.lastValleys.push(dt);
-                if (buf.lastValleys.length > 6) buf.lastValleys.shift();
-                const avgDt = buf.lastValleys.reduce((s,x)=>s+x,0) / buf.lastValleys.length;
-                buf.cadence = 60000 / avgDt * 2; // *2 because we count one leg only (steps per minute)
-            }
-            buf.lastPeakTime = now;
-            buf.strides++;
-            $('v-strides').textContent = buf.strides;
-            $('hud-cycle').textContent = '#' + buf.strides;
-            $('hud-cad').textContent = (buf.cadence > 0 ? buf.cadence.toFixed(0) : '—') + ' SPM';
-        }
-    }
-}
-
-// ============================================================
-// CHARTS
-// ============================================================
-
-function drawChart(canvasId, leftArr, rightArr) {
-    const c = $(canvasId);
-    const dpr = window.devicePixelRatio || 1;
-    const W = c.clientWidth, H = c.clientHeight;
-    if (c.width !== W * dpr) { c.width = W * dpr; c.height = H * dpr; }
-    const x = c.getContext('2d');
-    x.setTransform(dpr, 0, 0, dpr, 0, 0);
-    x.clearRect(0, 0, W, H);
-
-    // bg grid
-    x.strokeStyle = '#1f1f1f';
-    x.lineWidth = 1;
-    for (let i = 0; i < 5; i++) {
-        const y = (i / 4) * H;
-        x.beginPath(); x.moveTo(0, y); x.lineTo(W, y); x.stroke();
-    }
-
-    // axis labels
-    x.fillStyle = '#555';
-    x.font = '9px "Space Mono", monospace';
-    x.textAlign = 'right';
-    // determine range
-    const allVals = [...leftArr, ...rightArr].filter(v => v != null);
-    if (allVals.length === 0) return;
-    let mn = Math.min(...allVals), mx = Math.max(...allVals);
-    const pad = (mx - mn) * 0.1 + 5;
-    mn -= pad; mx += pad;
-    if (mx - mn < 20) { const m = (mn+mx)/2; mn = m-15; mx = m+15; }
-
-    for (let i = 0; i < 5; i++) {
-        const val = mx - (i/4) * (mx - mn);
-        x.fillText(val.toFixed(0) + '°', W - 4, (i/4) * H + 9);
-    }
-
-    // plot
-    const plot = (arr, color) => {
-        if (arr.length < 2) return;
-        x.strokeStyle = color;
-        x.lineWidth = 1.5;
-        x.beginPath();
-        let started = false;
-        const n = arr.length;
-        for (let i = 0; i < n; i++) {
-            const v = arr[i];
-            if (v == null) { started = false; continue; }
-            const px = (i / (MAX_HISTORY - 1)) * (W - 30);
-            const py = H - ((v - mn) / (mx - mn)) * H;
-            if (!started) { x.moveTo(px, py); started = true; }
-            else x.lineTo(px, py);
-        }
-        x.stroke();
-    };
-    plot(leftArr, '#ff6b1a');
-    plot(rightArr, '#4ad6e0');
-}
-
-let lastChartTime = 0;
-function updateCharts() {
-    const now = performance.now();
-    if (now - lastChartTime < 50) return; // 20fps redraw
-    lastChartTime = now;
-    drawChart('chart-knee', state.history.kneeL, state.history.kneeR);
-    drawChart('chart-hip', state.history.hipL, state.history.hipR);
-    drawChart('chart-ankle', state.history.ankL, state.history.ankR);
-}
-
-// ============================================================
-// HUD UPDATES
-// ============================================================
-
-function updateFPS() {
-    const now = performance.now();
-    state.fpsCount++;
-    if (now - state.fpsTime > 500) {
-        state.fps = state.fpsCount / ((now - state.fpsTime) / 1000);
-        state.fpsTime = now;
-        state.fpsCount = 0;
-        $('s-fps').textContent = state.fps.toFixed(0);
-    }
-    $('s-frame').textContent = String(state.frameCount).padStart(4, '0');
-}
-
-function updateHUDTime() {
-    if (state.mode === 'video' && !isNaN(video.duration)) {
-        const t = video.currentTime;
-        const tm = Math.floor(t / 60), ts = (t % 60).toFixed(2);
-        $('hud-time').textContent = `${String(tm).padStart(2,'0')}:${ts.padStart(5,'0')}`;
-        $('t-current').textContent = `${String(tm).padStart(2,'0')}:${String(Math.floor(t%60)).padStart(2,'0')}`;
-        if (!state.seeking) $('seek').value = (t / video.duration) * 100;
-    } else if (state.mode === 'live') {
-        const t = (performance.now() - state.startTime) / 1000;
-        const tm = Math.floor(t / 60), ts = (t % 60).toFixed(2);
-        $('hud-time').textContent = `${String(tm).padStart(2,'0')}:${ts.padStart(5,'0')}`;
-    }
-}
-
-// ============================================================
-// MODES
-// ============================================================
-
-function resetState() {
-    state.frameCount = 0;
-    state.rawLog = [];
-    state.minMax = {};
-    state.history = { kneeL:[], kneeR:[], hipL:[], hipR:[], ankL:[], ankR:[] };
-    state.cycleHistory = { kneeL:[], kneeR:[], hipL:[], hipR:[], ankL:[], ankR:[] };
-    state.strideDetector = { lastPeakTime: 0, lastValleys: [], strides: 0, cadence: 0 };
-    state.fpsCount = 0;
-    state.fps = 0;
-    state.startTime = performance.now();
-    state.fpsTime = state.startTime;
-    $('v-strides').textContent = '0';
-    $('hud-cycle').textContent = '—';
-    $('hud-cad').textContent = '— SPM';
-    ctx.clearRect(0,0,overlay.width, overlay.height);
-}
-
-async function startCamera() {
-    stopAll();
-    resetState();
-    state.mode = 'live';
-    $('s-source').textContent = 'CAMÉRA';
-    $('s-status').innerHTML = '<span class="live">LIVE</span>';
-    $('s-status').classList.add('live');
-    $('stage-empty').style.display = 'none';
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' },
-            audio: false
-        });
-        video.srcObject = stream;
-        video.src = '';
-        await video.play();
-        $('resolution').textContent = `${video.videoWidth}×${video.videoHeight}`;
-        state.running = true;
-        state.camera = new Camera(video, {
-            onFrame: async () => {
-                if (state.running && state.mode === 'live') await state.pose.send({ image: video });
-            },
-            width: video.videoWidth, height: video.videoHeight,
-        });
-        state.camera.start();
-        $('btn-stop').disabled = false;
-        $('btn-reset').disabled = false;
-        $('btn-playpause').disabled = true;
-        $('seek').disabled = true;
-    } catch (e) {
-        alert('Impossible d\'accéder à la caméra : ' + e.message);
-        $('s-status').textContent = 'ERREUR';
-    }
-}
-
-async function loadVideoFile(file) {
-    stopAll();
-    resetState();
-    state.mode = 'video';
-    $('s-source').textContent = file.name.substring(0, 20).toUpperCase();
-    $('s-status').textContent = 'VIDÉO CHARGÉE';
-    $('stage-empty').style.display = 'none';
-
-    const url = URL.createObjectURL(file);
-    video.srcObject = null;
-    video.src = url;
-    video.muted = true;
-    video.loop = false;
-    await new Promise(res => {
-        video.onloadedmetadata = res;
-    });
-    $('resolution').textContent = `${video.videoWidth}×${video.videoHeight}`;
-    const td = video.duration;
-    const tm = Math.floor(td / 60), ts = Math.floor(td % 60);
-    $('t-total').textContent = `${String(tm).padStart(2,'0')}:${String(ts).padStart(2,'0')}`;
-
-    $('btn-stop').disabled = false;
-    $('btn-reset').disabled = false;
-    $('btn-playpause').disabled = false;
-    $('seek').disabled = false;
-
-    state.running = true;
-    await video.play();
-    processVideoLoop();
-}
-
-async function processVideoLoop() {
-    if (!state.running || state.mode !== 'video') return;
-    if (!video.paused && !video.ended) {
-        await state.pose.send({ image: video });
-    }
-    if (!video.ended) {
-        if ('requestVideoFrameCallback' in video) {
-            video.requestVideoFrameCallback(() => processVideoLoop());
-        } else {
-            requestAnimationFrame(processVideoLoop);
-        }
-    } else {
-        $('s-status').textContent = 'TERMINÉ';
-    }
-}
-
-function stopAll() {
-    state.running = false;
-    if (state.camera) { try { state.camera.stop(); } catch(e){} state.camera = null; }
-    if (video.srcObject) {
-        video.srcObject.getTracks().forEach(t => t.stop());
-        video.srcObject = null;
-    }
-    video.pause();
-    video.src = '';
-    $('s-status').classList.remove('live');
-    $('s-status').textContent = 'ARRÊTÉ';
-}
-
-// ============================================================
-// EVENT LISTENERS
-// ============================================================
-
-$('btn-camera').addEventListener('click', startCamera);
-$('file-input').addEventListener('change', e => {
-    const f = e.target.files[0];
-    if (f) loadVideoFile(f);
-});
-$('btn-stop').addEventListener('click', () => {
-    stopAll();
-    $('btn-stop').disabled = true;
-    $('btn-playpause').disabled = true;
-    $('seek').disabled = true;
-});
-$('btn-reset').addEventListener('click', () => {
-    resetState();
-});
-$('btn-playpause').addEventListener('click', () => {
-    if (video.paused) {
-        video.play();
-        $('btn-playpause').textContent = '⏸ PAUSE';
-        if (state.mode === 'video') {
-            state.running = true;
-            processVideoLoop();
-        }
-    } else {
-        video.pause();
-        $('btn-playpause').textContent = '▶ PLAY';
-    }
-});
-$('seek').addEventListener('input', e => {
-    state.seeking = true;
-    if (!isNaN(video.duration)) {
-        video.currentTime = (e.target.value / 100) * video.duration;
-    }
-});
-$('seek').addEventListener('change', () => {
-    state.seeking = false;
-});
-
-// EXPORT
-$('btn-export-csv').addEventListener('click', () => {
-    if (state.rawLog.length === 0) { alert('Aucune donnée à exporter.'); return; }
-    let csv = 'time_s,frame,knee_L,knee_R,hip_L,hip_R,ankle_L,ankle_R,trunk\n';
-    for (const r of state.rawLog) {
-        const a = r.angles;
-        csv += `${r.t.toFixed(3)},${r.f},${a.kneeL?.toFixed(2)??''},${a.kneeR?.toFixed(2)??''},${a.hipL?.toFixed(2)??''},${a.hipR?.toFixed(2)??''},${a.ankL?.toFixed(2)??''},${a.ankR?.toFixed(2)??''},${a.trunk?.toFixed(2)??''}\n`;
-    }
-    download(csv, 'gait_data.csv', 'text/csv');
-});
-$('btn-export-json').addEventListener('click', () => {
-    if (state.rawLog.length === 0) { alert('Aucune donnée à exporter.'); return; }
-    const json = JSON.stringify({
-        meta: {
-            generatedAt: new Date().toISOString(),
-            frames: state.rawLog.length,
-            strides: state.strideDetector.strides,
-            cadence: state.strideDetector.cadence,
-            stats: state.minMax,
-        },
-        data: state.rawLog,
-    }, null, 2);
-    download(json, 'gait_data.json', 'application/json');
-});
-
-function download(content, name, type) {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = name; a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-// ============================================================
-// INIT
-// ============================================================
-window.addEventListener('load', initPose);
-</script>
-</body>
+  </body>
 </html>
